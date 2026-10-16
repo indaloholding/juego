@@ -23,45 +23,14 @@ const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;
 const fmtTime = (t) => new Date(t).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 const fmtDT = (t) => new Date(t).toLocaleString('es-ES', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 const eur = (n) => `${Math.round(n).toLocaleString('es-ES')} €`;
-const ACCESS = 'safiye-911-access';
-const CODE = '911';
 const LOC_LABEL = { casa: '🏠 Casa · Stuttgart', stuttgart: '🇩🇪 Clínica Stuttgart', estambul: '🇹🇷 Clínica Estambul', barcelona: '🇪🇸 Clínica Barcelona' };
 
 let S, engine, house = null, clinic = null, busy = false, traveling = false;
 const cured = new Set();
 
-/* ============ Acceso con código 911 ============ */
-function gate(next) {
-  let ok = false; try { ok = localStorage.getItem(ACCESS) === 'ok'; } catch (e) { /* privado */ }
-  if (ok) return next();
-  $('#sess').hidden = true; $('#gate').hidden = false;
-  let code = '';
-  const cells = [...document.querySelectorAll('#code i')];
-  const draw = () => cells.forEach((c, i) => { c.textContent = code[i] ? '•' : ''; c.classList.toggle('on', i === code.length); });
-  draw();
-  const press = (k) => {
-    if (k === 'del') { code = code.slice(0, -1); draw(); return; }
-    if (k === 'hint') { $('#hint').textContent = 'Pista: el modelo de su coche favorito 🏎️'; return; }
-    if (code.length >= 3) return;
-    code += k; sfx.key(); draw();
-    if (code.length === 3) {
-      if (code === CODE) {
-        $('#code').classList.add('ok'); cells.forEach((c, i) => (c.textContent = CODE[i])); sfx.engine(2.2);
-        try { localStorage.setItem(ACCESS, 'ok'); } catch (e) { /* nada */ }
-        setTimeout(next, 900);
-      } else {
-        $('#code').classList.add('shake'); sfx.bad(); $('#hint').textContent = 'Código incorrecto. Piensa en un Porsche…';
-        setTimeout(() => { $('#code').classList.remove('shake'); code = ''; draw(); }, 450);
-      }
-    }
-  };
-  $('#keypad').addEventListener('click', e => { const b = e.target.closest('button'); if (b) press(b.dataset.k || b.textContent); });
-  addEventListener('keydown', e => { if ($('#gate').hidden) return; if (/^\d$/.test(e.key)) press(e.key); if (e.key === 'Backspace') press('del'); });
-}
-
 /* ============ Arranque ============ */
 function start(remote) {
-  $('#gate').hidden = true; $('#sess').hidden = true; $('#game').hidden = false;
+  $('#sess').hidden = true; $('#game').hidden = false;
   const now = Date.now();
   G.useSessionKey(keyOf(player.name));
   const local = G.load();
@@ -802,7 +771,7 @@ async function switchSession() {
 }
 function sessView(view, opts = {}) {
   const el = $('#sessBody'), cur = session.current, known = session.known;
-  $('#sess').hidden = false; $('#gate').hidden = true;
+  $('#sess').hidden = false;
   if (view === 'home') {
     el.innerHTML = `${cur ? `<button class="btn primary big" data-s="continue">▶ Continuar como ${esc(cur.name)}</button>` : '<h2>¿Quién juega?</h2><p>Cada persona tiene su propia sesión: sus clínicas, sus animales y su Alejandro.</p>'}
       <button class="btn ${cur ? '' : 'primary'} big" data-s="login">🔑 Iniciar sesión</button>
@@ -834,9 +803,9 @@ async function sessAction(a, btn) {
   if (a === 'home' || a === 'login' || a === 'create') return sessView(a);
   if (a === 'continue') {
     const cur = session.current; btn.disabled = true; btn.textContent = 'Cargando tu partida…';
-    try { const r = await session.load(cur); player = { name: r.name, token: cur.token }; gate(() => start(r.data)); }
+    try { const r = await session.load(cur); player = { name: r.name, token: cur.token }; start(r.data); }
     catch (e) {
-      if (e.status === 0) { player = { name: cur.name, token: cur.token }; offline = true; gate(() => start(null)); }
+      if (e.status === 0) { player = { name: cur.name, token: cur.token }; offline = true; start(null); }
       else { session.forget(); sessView('login', { name: cur.name, msg: e.message }); }
     }
     return;
@@ -845,7 +814,7 @@ async function sessAction(a, btn) {
     const name = val('#sName'), pin = val('#sPin');
     if (name.length < 2) return err('Escribe tu nombre.'); if (!/^\d{4}$/.test(pin)) return err('El PIN son 4 cifras.');
     btn.disabled = true;
-    try { const r = await session.login(name, pin); player = { name: r.name, token: r.token }; session.remember(player); sfx.ok(); gate(() => start(r.data)); }
+    try { const r = await session.login(name, pin); player = { name: r.name, token: r.token }; session.remember(player); sfx.ok(); start(r.data); }
     catch (e) { btn.disabled = false; err(e.message); }
     return;
   }
@@ -859,7 +828,7 @@ async function sessAction(a, btn) {
       const r = await session.create(name, pin, legacy);
       player = { name: r.name, token: r.token, importLegacy: useLegacy }; session.remember(player); sfx.ok();
       if (legacy) G.dropLegacy();
-      gate(() => start(r.data));
+      start(r.data);
     } catch (e) { btn.disabled = false; err(e.message); }
   }
 }

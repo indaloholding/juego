@@ -18,7 +18,7 @@ export const LEGAL = {
 <li><b>Gerente:</b> ${T.gerente}</li><li><b>Correo electrónico de contacto:</b> ${mail}</li>
 <li><b>Representante en la UE (art. 27 RGPD):</b> ${T.rep}</li>
 </ul>
-<h3>Objeto</h3><p>«Safiye · The Videogame» es un videojuego web gratuito, creado como regalo personal y de acceso restringido mediante código. No tiene fines comerciales ni contiene compras.</p>
+<h3>Objeto</h3><p>«Safiye · The Videogame» es un videojuego web gratuito, creado como regalo personal. No tiene fines comerciales ni contiene compras.</p>
 <h3>Propiedad intelectual</h3><p>El código, los modelos 3D procedurales, los textos y el diseño son obra del titular o se usan con licencia abierta (Three.js, MIT; tipografías Fredoka y Nunito, SIL Open Font License). Los nombres de marcas mencionados (Porsche 911, PlayStation, McDonald's, Amazon, Instagram) pertenecen a sus propietarios y se citan solo con fines humorísticos y descriptivos, sin relación ni patrocinio.</p>
 <h3>Responsabilidad</h3><p>Todo el contenido es ficticio y de humor. Los «tratamientos» del juego no son consejos veterinarios: ante cualquier problema de salud de un animal real, consulta con un veterinario colegiado.</p>
 <h3>Legislación</h3><p>Este aviso se rige por la legislación española en lo aplicable a usuarios ubicados en España.</p>`],
@@ -35,11 +35,11 @@ export const LEGAL = {
   cookies: ['Política de cookies', `
 <p>Conforme al artículo 22.2 de la LSSI-CE:</p>
 <p>Este sitio <b>no utiliza cookies</b> propias ni de terceros, ni de analítica, ni de publicidad, ni de redes sociales. Las tipografías van incluidas en la propia web, sin conexión a servicios externos.</p>
-<p>Solo se usa el <b>almacenamiento local del navegador</b> (localStorage) para cosas estrictamente necesarias para el funcionamiento que pides: recordar tu sesión (nombre e identificador de sesión), que ya has introducido el código de acceso y una copia de tu partida. Al ser técnico y necesario, está exento de consentimiento y por eso no se muestra un banner de cookies.</p>
+<p>Solo se usa el <b>almacenamiento local del navegador</b> (localStorage) para cosas estrictamente necesarias para el funcionamiento que pides: recordar tu sesión (nombre e identificador de sesión) y guardar una copia de tu partida. Al ser técnico y necesario, está exento de consentimiento y por eso no se muestra un banner de cookies.</p>
 <p>Puedes borrar estos datos desde <i>Ajustes › Cambiar de sesión</i> o <i>Borrar mi sesión</i>, o desde la configuración de tu navegador.</p>
 <p class="fine">Última actualización: ${UPD}.</p>`],
   terminos: ['Términos y condiciones', `
-<h3>1. Qué es</h3><p>«Safiye · The Videogame» es un juego web gratuito ofrecido por ${T.nombre} como regalo personal. El acceso requiere un código.</p>
+<h3>1. Qué es</h3><p>«Safiye · The Videogame» es un juego web gratuito ofrecido por ${T.nombre} como regalo personal. Para jugar, cada persona crea su propia sesión.</p>
 <h3>2. Uso</h3><p>Puedes jugar libremente para uso personal y no comercial. No está permitido copiar, revender o explotar comercialmente el juego.</p>
 <h3>3. Contenido ficticio</h3><p>Personajes, casos clínicos y situaciones son inventados y en tono de humor. Ningún animal real ha sufrido durante el desarrollo (algún gato ha llevado gafas, eso sí). El dinero del juego es virtual y no tiene valor real; no existen compras dentro del juego.</p>
 <h3>4. Sesiones</h3><p>Cada persona crea su propia sesión con un nombre y un PIN. Guarda tu PIN: si lo olvidas, escribe a ${mail} para recuperar la sesión. No uses tu nombre completo si prefieres un apodo.</p>

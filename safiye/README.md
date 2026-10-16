@@ -2,7 +2,7 @@
 
 Juego web en tiempo real hecho como regalo para Safiye: clínicas veterinarias en Stuttgart, Estambul y Barcelona (dirigida por Emilio), un Porsche 911 para moverse y Alejandro en casa esperando masajes y chuletones.
 
-- **Jugar:** https://safiye-the-videogame.netlify.app (código de acceso: el modelo del Porsche)
+- **Jugar:** https://safiye-the-videogame.netlify.app (cada jugador crea su sesión con nombre y PIN)
 - **Stack:** Three.js + Vite, compilado a un único `index.html` (`vite-plugin-singlefile`). Sin backend: la partida se guarda en `localStorage`.
 - **Base:** rigs procedurales y paleta inspirados en `web-kitchen-rush/` de este repo; materiales Liquid Glass de `indaloholding/apple-design`.
 
