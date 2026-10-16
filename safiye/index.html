@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>Safiye · The Videogame</title>
+  <meta name="description" content="Safiye · The Videogame: dirige clínicas veterinarias en Stuttgart, Estambul y Barcelona en tiempo real, viaja en Porsche 911 y mantén feliz a Alejandro." />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#fff2d7" />
+  <meta property="og:title" content="Safiye · The Videogame" />
+  <meta property="og:description" content="Gatos con gafas, leones con sombrero, un Porsche 911 y Alejandro esperando su chuletón. Un juego en tiempo real hecho para Safiye." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/og.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="/og.jpg" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/og.jpg" />
+</head>
+<body>
+  <!-- Acceso -->
+  <section id="gate" class="gate">
+    <div class="gate-inner">
+      <p class="eyebrow">Un regalo para la mejor veterinaria de Europa</p>
+      <h1 class="wordmark">Safiye<span>The Videogame</span></h1>
+      <p class="gate-sub">Introduce el código de acceso</p>
+      <div class="code" id="code" aria-live="polite"><i></i><i></i><i></i></div>
+      <div class="keypad" id="keypad">
+        <button>1</button><button>2</button><button>3</button>
+        <button>4</button><button>5</button><button>6</button>
+        <button>7</button><button>8</button><button>9</button>
+        <button data-k="del" aria-label="Borrar">⌫</button><button>0</button><button data-k="hint" aria-label="Pista">?</button>
+      </div>
+      <p class="hint" id="hint">&nbsp;</p>
+    </div>
+    <footer class="legal-mini"><a href="#" data-legal="aviso">Aviso legal</a> · <a href="#" data-legal="privacidad">Privacidad</a> · <a href="#" data-legal="cookies">Cookies</a> · <a href="#" data-legal="terminos">Términos</a></footer>
+  </section>
+
+  <!-- Juego -->
+  <main id="game" hidden>
+    <canvas id="c" aria-label="Escena 3D del juego"></canvas>
+    <div id="labels"></div>
+
+    <header class="hud glass">
+      <div class="stat"><span>💶</span><b id="money">0 €</b></div>
+      <div class="stat"><span>⭐</span><b id="rep">3.0</b></div>
+      <div class="stat clock"><span>🕒</span><b id="clock">--:--</b><small>hora real</small></div>
+      <div class="stat loc" id="loc">🏠 Casa</div>
+    </header>
+
+    <button class="ale glass" id="ale" aria-label="Estado de Alejandro">
+      <span class="ale-face" id="aleFace">🙂</span>
+      <span class="ale-body"><b>Alejandro</b><small id="aleMood">Contento</small>
+        <span class="bar"><i id="aleBar"></i></span></span>
+    </button>
+
+    <aside class="side glass" id="side">
+      <button class="side-toggle" id="sideToggle" aria-label="Mostrar u ocultar pacientes"><span id="sideBadge">0</span><b>Pacientes</b><em>‹</em></button>
+      <div class="side-body" id="sideBody"></div>
+    </aside>
+
+    <nav class="dock glass" id="dock">
+      <button data-go="casa"><span>🏠</span>Casa</button>
+      <button data-go="viajar"><span>🏎️</span>Viajar</button>
+      <button data-go="mejoras"><span>🛠️</span>Mejoras</button>
+      <button data-go="diario"><span>📖</span>Diario</button>
+      <button data-go="ajustes"><span>⚙️</span>Ajustes</button>
+    </nav>
+
+    <div id="pop" class="pop glass" hidden></div>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+    <div id="travel" class="travel" hidden><p id="travelTxt"></p><button id="skip">Saltar ⏭</button></div>
+  </main>
+
+  <div id="modal" class="modal" hidden>
+    <div class="sheet glass" role="dialog" aria-modal="true">
+      <button class="close" id="modalClose" aria-label="Cerrar">✕</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+  <noscript>Este juego necesita JavaScript.</noscript>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
