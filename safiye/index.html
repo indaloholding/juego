@@ -66,6 +66,25 @@
       <button data-go="ajustes"><span>⚙️</span>Ajustes</button>
     </nav>
 
+    <button class="lotto" id="lotto" title="Botón de la beta">🎰 <span>Me ha tocado la lotería</span><small>beta</small></button>
+
+    <aside class="home glass" id="home" hidden>
+      <div class="home-head"><span class="seg" id="who"><button data-who="safi" class="on">👩‍⚕️ Safi</button><button data-who="ale">🧔 Alejandro</button></span>
+        <button class="home-toggle" id="homeToggle" aria-label="Mostrar u ocultar acciones">Acciones <em>▾</em></button></div>
+      <div class="home-body">
+        <p class="keys">⬆️⬇️⬅️➡️ para moverte · <kbd>E</kbd> para interactuar</p>
+        <div id="homeActs" class="acts"></div>
+        <div class="music-row" id="musicRow"></div>
+      </div>
+    </aside>
+
+    <div id="prompt" class="prompt glass" hidden></div>
+    <div id="dpad" class="dpad" hidden>
+      <button data-k="ArrowUp" aria-label="Arriba">▲</button><button data-k="ArrowLeft" aria-label="Izquierda">◀</button><button data-k="act" aria-label="Interactuar">E</button><button data-k="ArrowRight" aria-label="Derecha">▶</button><button data-k="ArrowDown" aria-label="Abajo">▼</button>
+    </div>
+    <button class="more glass" id="more" hidden>🚑 Atender más animales</button>
+    <div id="tip" class="tip glass" hidden><span id="tipTxt"></span><button id="tipX" aria-label="Ocultar consejos">✕</button></div>
+    <div id="tooltip" class="tooltip" hidden></div>
     <div id="pop" class="pop glass" hidden></div>
     <div id="toasts" class="toasts" aria-live="polite"></div>
     <div id="travel" class="travel" hidden><p id="travelTxt"></p><button id="skip">Saltar ⏭</button></div>

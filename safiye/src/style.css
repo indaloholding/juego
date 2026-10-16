@@ -192,3 +192,55 @@ canvas.massage { width: 100%; max-width: 360px; aspect-ratio: 360 / 400; display
   .dock button { min-width: 0; padding: 6px 4px; flex: 1; font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+/* ---------- v2: casa jugable, lotería, consejos ---------- */
+.lotto { position: absolute; right: 12px; top: 92px; border: 0; border-radius: 14px; padding: 9px 14px; font-weight: 800; font-size: 13px; color: #233d3b;
+  background: linear-gradient(135deg, #ffe08a, #f2b743); box-shadow: 0 4px 0 #b9862a, 0 8px 18px rgba(0,0,0,.18); display: flex; gap: 6px; align-items: center; }
+.lotto small { background: #233d3b; color: #fff2d7; border-radius: 6px; padding: 1px 5px; font-size: 10px; }
+.lotto:active { transform: translateY(2px); box-shadow: 0 1px 0 #b9862a; }
+.home { position: absolute; left: 12px; top: 140px; width: 280px; max-height: calc(100% - 240px); overflow: auto; padding: 12px; }
+.home-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.home-toggle { border: 0; background: none; font-weight: 800; font-size: 13px; display: flex; gap: 4px; align-items: center; }
+.home-toggle em { font-style: normal; transition: rotate .2s; }
+.home.collapsed .home-body { display: none; } .home.collapsed .home-toggle em { rotate: -90deg; }
+.home.collapsed { width: auto; }
+.keys { font-size: 12px; color: var(--ink-2); font-weight: 700; margin: 8px 0; }
+kbd { background: var(--ink); color: var(--paper); border-radius: 5px; padding: 0 5px; font-size: 11px; }
+.acts { display: grid; gap: 5px; }
+.act { display: flex; gap: 8px; align-items: center; border: 0; background: rgba(255,255,255,.6); border-radius: 11px; padding: 7px 10px; font-weight: 800; font-size: 13px; text-align: left; }
+:root[data-theme='dark'] .act { background: rgba(255,255,255,.07); }
+.act:hover { background: #fff; } .act span { font-size: 18px; } .act small { margin-left: auto; color: var(--ink-2); font-size: 11px; }
+.music-row { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px; }
+.music-row button { border: 0; border-radius: 9px; padding: 5px 9px; font-weight: 800; font-size: 12px; background: rgba(0,0,0,.06); }
+.music-row button.on { background: #e05f8a; color: #fff; }
+.prompt { position: absolute; left: 50%; bottom: 96px; translate: -50% 0; display: flex; gap: 6px; align-items: center; padding: 8px; z-index: 15; }
+.prompt b { font-family: var(--display); padding: 0 6px; white-space: nowrap; }
+.prompt button { border: 0; border-radius: 10px; padding: 8px 12px; font-weight: 800; background: var(--teal); color: #fff; white-space: nowrap; }
+.prompt button + button { background: var(--paper-2); color: var(--ink); }
+.dpad { position: absolute; right: 14px; bottom: 96px; display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 4px; z-index: 14; }
+.dpad button { border: 0; border-radius: 14px; background: var(--glass-strong); box-shadow: var(--shadow); font-size: 18px; font-weight: 800; touch-action: none; user-select: none; -webkit-user-select: none; }
+.dpad [data-k=ArrowUp] { grid-column: 2; grid-row: 1; } .dpad [data-k=ArrowLeft] { grid-column: 1; grid-row: 2; } .dpad [data-k=act] { grid-column: 2; grid-row: 2; background: var(--teal); color: #fff; }
+.dpad [data-k=ArrowRight] { grid-column: 3; grid-row: 2; } .dpad [data-k=ArrowDown] { grid-column: 2; grid-row: 3; }
+.more { position: absolute; left: 12px; bottom: 96px; border: 0; padding: 12px 16px; font-weight: 800; font-size: 14px; background: var(--tomato); color: #fff; border-radius: 14px; box-shadow: 0 4px 0 #9c3324, var(--shadow); }
+.more:active { transform: translateY(2px); }
+.side-more { width: 100%; border: 0; border-radius: 11px; padding: 9px; font-weight: 800; background: var(--tomato); color: #fff; margin: 4px 0 6px; }
+.tip { position: absolute; left: 50%; bottom: 150px; translate: -50% 0; padding: 8px 10px 8px 14px; font-size: 13px; font-weight: 700; display: flex; gap: 10px; align-items: center; max-width: min(92vw, 520px); z-index: 13; }
+.tip button { border: 0; background: none; opacity: .5; }
+.tooltip { position: fixed; z-index: 40; pointer-events: none; background: var(--ink); color: var(--paper); font-size: 12px; font-weight: 800; padding: 5px 9px; border-radius: 8px; white-space: nowrap; transform: translate(14px, 14px); }
+.prob { display: flex; gap: 10px; align-items: center; background: #fff3c9; color: #233d3b; border-radius: 12px; padding: 8px 10px; margin: 6px 0; }
+.prob span { font-size: 30px; } .prob b { display: block; font-size: 15px; } .prob small { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+@media (max-width: 760px) {
+  .lotto { top: 68px; right: 8px; padding: 6px 9px; } .lotto span { display: none; }
+  .home { top: auto; bottom: 90px; left: 8px; width: calc(100% - 190px); max-height: 42%; padding: 8px; }
+  .home .keys { display: none; } .home-head { flex-wrap: wrap; }
+  .prompt { bottom: 270px; flex-wrap: wrap; max-width: calc(100% - 24px); } .tip { bottom: auto; top: 120px; font-size: 12px; } .more { bottom: 90px; }
+}
+@media (pointer: fine) { .dpad { display: none !important; } }
+
+.side:not(.collapsed) ~ #more { display: none; }
+@media (max-width: 760px) {
+  #side.collapsed { width: 150px !important; }
+  .home { max-width: calc(100% - 190px); }
+  .home.collapsed .home-toggle { padding: 0 2px; }
+  .dpad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); right: 8px; bottom: 92px; }
+}

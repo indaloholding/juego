@@ -191,7 +191,8 @@ export function unlock(s, k, now) {
 }
 
 /** Qué hace Alejandro según la hora real. */
-export function aleActivity(date = new Date()) {
+export function aleActivity(date = new Date(), s = null) {
+  if (s && s.aleOverride && s.aleOverride.until > date.getTime()) return s.aleOverride.act;
   const h = date.getHours() + date.getMinutes() / 60, dow = date.getDay(), weekend = dow === 0 || dow === 6;
   if (h < 7.5 || h >= 23.75) return 'dormir';
   if (!weekend && ((h >= 9 && h < 13.5) || (h >= 14.5 && h < 18))) return 'trabajo';
@@ -207,4 +208,51 @@ export function fmtLeft(ms) {
   if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60), r = m % 60;
   return r ? `${h} h ${r} min` : `${h} h`;
+}
+
+/** «Atender más animales»: llegan pacientes ya (hasta llenar la sala). */
+export function callMore(s, clinic, now, n = 2) {
+  let k = 0;
+  for (; k < n; k++) {
+    if (s.patients.filter(p => p.clinic === clinic).length >= CLINICS[clinic].cap + 1) break;
+    const p = spawn(s, clinic, now);
+    addLog(s, now, '🚑', `Llega ${p.name} a ${CLINICS[clinic].name}: ${caseOf(p).title}.`);
+  }
+  return k;
+}
+/** Botón beta: ¡me ha tocado la lotería! */
+export function lottery(s, now) {
+  s.money += 1000000;
+  for (const k of Object.keys(CLINICS)) if (!s.unlocked[k]) { s.unlocked[k] = true; s.nextArrival[k] = now + 20 * MIN; spawn(s, k, now); }
+  if (!s.emilioNext) s.emilioNext = now + 90 * MIN;
+  for (const u of ['hierba', 'musica', 'cafetera', 'turbo']) s.upgrades[u] = true;
+  addLog(s, now, '🎰', '¡Le ha tocado la lotería a Safiye! Un millón de euros, todas las clínicas y el GT3 RS.');
+}
+/** Efecto de las acciones en casa sobre Alejandro (y su dinero). */
+const ACT_FX = {
+  play: { relax: 15, bonus: 6, min: 45, txt: '¡Partidita a la Play! 🎮' },
+  trabajo: { bonus: -2, money: 80, min: 45, cd: 30, txt: 'Teletrabajo: +80 € 💻' },
+  barbacoa: { sac: 35, bonus: 8, money: -20, min: 40, txt: 'Barbacoa en el jardín 🔥' },
+  piscina: { relax: 20, bonus: 6, min: 40, txt: '¡Al agua! 🛟' },
+  dormir: { relax: 30, min: 60, txt: 'A dormir un rato 😴' },
+  ducha: { relax: 10, bonus: 3, txt: 'Ducha con concierto incluido 🎤' },
+  cesped: { bonus: 5, cd: 20, txt: 'Césped cortado: jardín de revista 🌱' },
+  macetas: { bonus: 4, cd: 20, txt: 'Macetas arregladas 🪴' },
+  nevera: { sac: 12, bonus: 2, txt: 'Picoteo de la nevera 🧀' },
+  bailar: { relax: 10, bonus: 12, txt: 'Bachata en el salón 💃🕺' },
+  barbacoaSafi: { sac: 30, bonus: 8, money: -20, txt: 'Safi hace una barbacoa para Alejandro 🔥' },
+  romance: { relax: 100, bonus: 30, cd: 30, txt: 'Noche romántica ❤️‍🔥' },
+};
+export function aleDo(s, act, now) {
+  const fx = ACT_FX[act]; if (!fx) return { ok: true };
+  s.cool ||= {};
+  if (fx.cd && s.cool[act] && now - s.cool[act] < fx.cd * MIN) return { ok: false, wait: fx.cd * MIN - (now - s.cool[act]) };
+  if (fx.cd) s.cool[act] = now;
+  if (fx.sac) s.ale.sac = clamp(s.ale.sac + fx.sac, 0, 100);
+  if (fx.relax) s.ale.relax = clamp(s.ale.relax + fx.relax, 0, 100);
+  if (fx.bonus) s.ale.bonus = clamp(s.ale.bonus + fx.bonus, -35, 45);
+  if (fx.money) { s.money += fx.money; if (fx.money > 0) s.stats.earned += fx.money; }
+  if (fx.min) s.aleOverride = { act, until: now + fx.min * MIN };
+  addLog(s, now, '🏠', fx.txt);
+  return { ok: true, txt: fx.txt };
 }

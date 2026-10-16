@@ -7,7 +7,7 @@ const SCENERY = {
   estambul: { ground: '#c9b98f', far: '#3a8fc2' }, barcelona: { ground: '#d8c08a', far: '#3fa0d0' },
 };
 
-export function buildDrive(engine, dest, color, duration, onDone) {
+export function buildDrive(engine, dest, color, duration, onDone, gt3 = false) {
   const sc = SCENERY[dest] || SCENERY.casa;
   const root = group(engine.world);
   mesh(new THREE.BoxGeometry(400, 0.1, 60), sc.ground, 0, -0.06, 0, root);
@@ -22,7 +22,7 @@ export function buildDrive(engine, dest, color, duration, onDone) {
     else if (dest === 'estambul' && i % 4 === 0) { const p = group(props, x, 0, z); cyl(0.12, 0.15, 3.5, '#ece6da', 0, 1.75, 0, p, 8); mesh(new THREE.ConeGeometry(0.17, 0.8, 8), '#8a9aa6', 0, 3.9, 0, p); }
     else tree(props, x, z, 0.6 + (i % 3) * 0.2);
   }
-  const car = makePorsche(color); car.rotation.y = Math.PI / 2; car.position.set(-6, 0.02, 1); root.add(car);
+  const car = makePorsche(color, gt3); car.rotation.y = Math.PI / 2; car.position.set(-6, 0.02, 1); root.add(car);
   engine.frame([0, 0.6, 1], 19, 1.0, 0.9);
   const cam = engine.camera, ctl = engine.controls; ctl.enabled = false;
   let k = 0, speed = 0;

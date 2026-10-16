@@ -8,8 +8,8 @@ const THEMES = {
   estambul: { floor: () => { const t = tileTexture('#2f8fa3', '#f1ece2', 12); t.repeat.set(2, 1.5); return t; }, wall: '#f6efe2', accent: '#c0392b', bench: '#1f6f8b' },
   barcelona: { floor: () => { const t = tileTexture('#d9822b', '#f3e3c8', 14, 'rgba(120,60,20,.25)'); t.repeat.set(2, 1.5); return t; }, wall: '#fbf4ea', accent: '#d9822b', bench: '#b5654a' },
 };
-const SCALE = { gato: 1.65, 'pájaro': 1.45, 'león': 0.85, jirafa: 0.72, elefante: 0.68 };
-const WAIT = [[-4.6, -2.9], [-4.6, -0.4], [-4.6, 2.1], [-2.2, 3.4], [0.3, 3.4]];
+const SCALE = { gato: 1.65, 'pájaro': 1.45, 'león': 0.85, jirafa: 0.72, elefante: 0.68, hormiga: 1.7, 'pingüino': 1.05, cocodrilo: 1.0, tortuga: 1.25, mono: 1.0, panda: 0.9, flamenco: 0.9, pulpo: 1.0, camello: 0.75, rana: 1.45, perezoso: 1.0 };
+const WAIT = [[-4.6, -2.9], [-4.6, -0.4], [-4.6, 2.1], [-2.2, 3.4], [0.3, 3.4], [-2.5, -3.3], [-2.4, 0.9], [1.7, 3.7]];
 const OBS = [[4.6, -3.2], [4.6, -1.1], [2.5, -3.5]];
 const TABLE = [0.4, -1.7], SAF_T = [1.7, -0.6], SAF_IDLE = [1.9, 0.6], DOOR = [4.6, 6.0];
 
@@ -88,7 +88,7 @@ export function buildClinic(engine, key, cb) {
   mesh(new THREE.PlaneGeometry(2.4, 0.4), M('#fff', { map: textTexture('OBSERVACIÓN', { color: '#233d3b', bg: '#f2b743', size: 110, w: 1100, h: 180 }) }), 3.6, 1.8, -4.4, root, false);
   // exterior: porsche aparcado
   mesh(new THREE.BoxGeometry(14.4, 0.05, 2.4), '#bdb6aa', 0, 0, 5.9, root);
-  const porsche = makePorsche(cb.porscheColor); porsche.position.set(-2.5, 0.03, 6.0); porsche.rotation.y = Math.PI / 2; porsche.scale.setScalar(0.95); root.add(porsche);
+  const porsche = makePorsche(cb.porscheColor, cb.gt3); porsche.position.set(-2.5, 0.03, 6.0); porsche.rotation.y = Math.PI / 2; porsche.scale.setScalar(0.95); root.add(porsche);
   porsche.userData.onClick = (pt) => cb.onPorsche(pt);
   // luces
   for (const [x, z] of [[-2.5, 0], [2.5, 0]]) { const l = new THREE.PointLight('#ffe2b0', 0, 9, 1.5); l.position.set(x, 2.5, z); l.userData.base = 8; root.add(l); engine.nightLights.push(l); }
@@ -134,7 +134,7 @@ export function buildClinic(engine, key, cb) {
       engine.updaters.add(f);
     } else {
       const cheer = engine.label(e.a.root, '💚', 'float', e.a.height * SCALE[e.p.species] + 0.2);
-      walkPath(engine, e.a, [[3.2, 3.9], DOOR], 2.2).then(() => { e.a.root.removeFromParent(); engine.removeLabel(cheer); });
+      walkPath(engine, e.a, [[1.2, 1.2], [3.2, 3.9], DOOR], 1.4).then(() => { e.a.root.removeFromParent(); engine.removeLabel(cheer); });
     }
   }
   function sync(patients, cured = new Set()) {
@@ -159,7 +159,12 @@ export function buildClinic(engine, key, cb) {
     const fx = engine.label(e.a.root, ok ? '✨🩺✨' : '😾💢', 'float', e.a.height * SCALE[e.p.species] + 0.1);
     let k = 0; await new Promise(r => { const f = (dt, t) => { k += dt; saf.arms[0].rotation.x = -1.2 + Math.sin(t * 12) * 0.3; if (!ok) e.a.root.rotation.y += Math.sin(t * 30) * 0.05; if (k > 2.0) { engine.updaters.delete(f); r(); } }; engine.updaters.add(f); });
     engine.removeLabel(fx); saf.armPose = false;
-    if (ok && accessory) makeAccessory(accessory, e.a.anchors);
+    if (ok && accessory) {
+      makeAccessory(accessory, e.a.anchors);
+      const wow = engine.label(e.a.root, '✨ ¡Tratamiento puesto! ✨', 'bubble', e.a.height * SCALE[e.p.species] + 0.5);
+      let j = 0; await new Promise(r => { const f = (dt) => { j += dt; e.a.root.rotation.y += dt * 6.3; e.a.root.position.y = e.a.baseY + Math.sin(Math.min(1, j) * Math.PI) * 0.5; if (j > 1.1) { engine.updaters.delete(f); r(); } }; engine.updaters.add(f); });
+      setTimeout(() => engine.removeLabel(wow), 1500);
+    }
     e.a.baseY = 0; e.a.root.position.y = 0;
     if (!big) e.a.root.position.set(spot[0], 0, spot[1]);
     e.busy = false;

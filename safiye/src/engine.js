@@ -35,6 +35,7 @@ export class Engine {
       if (d < 7) this.pick(e);
     });
     canvas.addEventListener('pointermove', e => this.hover(e));
+    canvas.addEventListener('pointerleave', () => this.onHover && this.onHover(null));
     const ro = new ResizeObserver(() => this.resize()); ro.observe(canvas);
     this.resize();
     this.loop = this.loop.bind(this); requestAnimationFrame(this.loop);
@@ -80,7 +81,10 @@ export class Engine {
   }
   hover(e) {
     if (e.pointerType !== 'mouse') return;
-    this.renderer.domElement.style.cursor = this.intersect(e) ? 'pointer' : 'grab';
+    const r = this.intersect(e);
+    this.renderer.domElement.style.cursor = r ? 'pointer' : 'grab';
+    let o = r && r.hit.object; while (o && !o.userData.hint) o = o.parent;
+    if (this.onHover) this.onHover(o ? o.userData.hint : null, e);
   }
   /** Etiqueta HTML que sigue a un objeto 3D. */
   label(obj, html, cls = '', dy = 0) {

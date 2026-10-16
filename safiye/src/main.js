@@ -7,7 +7,9 @@ import '@fontsource/nunito/latin-800.css';
 import './style.css';
 import * as THREE from 'three';
 import { Engine } from './engine.js';
-import { buildHouse } from './house.js';
+import { buildHouse, HOTSPOTS, ACTIONS } from './house.js';
+import { ACC_FOR } from './models.js';
+import { music } from './music.js';
 import { buildClinic } from './clinic.js';
 import { buildDrive } from './drive.js';
 import { CASES, TREATMENTS, CLINICS, FOODS, UPGRADES, PORSCHE_COLORS, ALE_ACTIVITY, SPECIES_EMOJI, EMILIO_LINES, H, MIN } from './data.js';
@@ -72,7 +74,7 @@ function start() {
   if (!S.onboarded) onboarding();
   else if (away > 2 * MIN && events.length) awaySummary(events, away);
   G.save(S);
-  if (import.meta.env.DEV) window.__safiye = { get S() { return S; }, get engine() { return engine; }, travelTo, loadScene, tick, massageGame };
+  if (import.meta.env.DEV) window.__safiye = { get S() { return S; }, get engine() { return engine; }, get house() { return house; }, get clinic() { return clinic; }, travelTo, loadScene, tick, massageGame, doAction, setCtrl, romanceScene, danceScene, setMusic };
   addEventListener('visibilitychange', () => { if (document.hidden) G.save(S); });
   addEventListener('pagehide', () => G.save(S));
 }
@@ -83,25 +85,31 @@ function applySettings() {
 
 /* ============ Escenas ============ */
 function loadScene(loc) {
-  closePop(); engine.clear(); house = clinic = null;
+  closePop(); engine.clear(); house = clinic = null; hidePrompt();
+  const gt3 = !!S.upgrades.turbo;
   if (loc === 'casa') {
     house = buildHouse(engine, {
-      porscheColor: S.porscheColor, atHome: true,
-      onAle: (pt) => openAle(), onAleSpot: (a) => { if (house.activity === a) openAle(); },
-      onKitchen: () => openCook(house.saf.root), onPorsche: () => openTravel(),
-      onTV: () => bubble(house.ale.head, house.activity === 'play' ? '¡Ahora no, Safi, que estoy en la prórroga! 🎮' : 'La PlayStation descansa. Por ahora.', 3500),
+      porscheColor: S.porscheColor, gt3, atHome: true, lawnCut: S.lawnCut && Date.now() - S.lawnCut < 24 * H,
+      onAle: () => openAle(), onSpot: (id) => openSpot(id), onPorsche: () => openTravel(),
+      onTV: () => bubble(house.ale.head, house.activity === 'play' ? '¡Ahora no, Safi, que estoy en la prórroga! 🎮' : 'Toca el sofá y me pongo a jugar 😏', 3500),
       onSafiye: () => bubble(house.saf.head, ['¡A por el día! 💪', 'Alejandro, ¿has comido?', 'Echo de menos a mis gatitos de la clínica.'][Math.floor(Math.random() * 3)], 2500),
     });
-    house.setActivity(G.aleActivity());
+    house.setActivity(G.aleActivity(new Date(), S));
+    house.setMusic(!!music.playing);
+    engine.updaters.add(controlLoop);
   } else {
     clinic = buildClinic(engine, loc, {
-      porscheColor: S.porscheColor, present: true,
+      porscheColor: S.porscheColor, gt3, present: true,
       onPatient: (id) => openPatient(id), onPorsche: () => openTravel(),
       onEmilio: (pt, em) => bubble(em.head, EMILIO_LINES[Math.floor(Math.random() * EMILIO_LINES.length)], 3500),
       onSafiye: () => bubble(clinic.saf.head, '¿Quién es el siguiente? 🩺', 2200),
     });
     clinic.sync(S.patients, cured);
   }
+  $('#home').hidden = loc !== 'casa'; $('#more').hidden = loc === 'casa';
+  $('#dpad').hidden = loc !== 'casa';
+  $('#side').classList.toggle('collapsed', loc === 'casa' || innerWidth < 760);
+  renderHome(); showTip(true);
   lighting();
 }
 function lighting() { const d = new Date(); engine.setLighting(d.getHours() + d.getMinutes() / 60, S.settings.light === 'day'); }
@@ -121,7 +129,7 @@ function tick() {
     clinic.sync(S.patients, cured);
     clinic.updateLabels(now, labelFor);
   }
-  if (house) house.setActivity(G.aleActivity(new Date(now)));
+  if (house && ctrl !== 'ale' && !house.ale.busy && !aleCmd) house.setActivity(G.aleActivity(new Date(now), S));
   if (now - lastSave > 5000) { G.save(S); lastSave = now; }
   if (new Date(now).getSeconds() === 0) lighting();
   renderHUD(now);
@@ -130,11 +138,13 @@ function tick() {
 function labelFor(p, now) {
   const em = SPECIES_EMOJI[p.species];
   if (p.status === 'obs') {
-    if (now >= p.reviewAt) return { html: `${em} ${esc(p.name)} · 🩺 ¡Revisión! (${G.fmtLeft(p.reviewDeadline - now)})`, cls: 'ready' };
-    return { html: `${em} ${esc(p.name)} · 🩺 en ${G.fmtLeft(p.reviewAt - now)}`, cls: 'obs' };
+    const tx = TREATMENTS[G.caseOf(p).t][1];
+    if (now >= p.reviewAt) return { html: `${em} ${esc(p.name)} ${tx} · 🩺 ¡Revisión! (${G.fmtLeft(p.reviewDeadline - now)})`, cls: 'ready' };
+    return { html: `${em} ${esc(p.name)} ${tx} · 🩺 en ${G.fmtLeft(p.reviewAt - now)}`, cls: 'obs' };
   }
   const left = p.deadline - now;
-  return { html: `${em} ${esc(p.name)} · ⏳ ${G.fmtLeft(left)}`, cls: left < H ? 'urgent' : '' };
+  const c = G.caseOf(p);
+  return { html: `${em} ${esc(p.name)} · <span style="font-size:15px">${c.sym}</span> ${esc(c.short)} · ⏳ ${G.fmtLeft(left)}`, cls: left < H ? 'urgent' : '' };
 }
 
 function renderHUD(now) {
@@ -155,6 +165,7 @@ function renderHUD(now) {
     if (!S.unlocked[k]) continue;
     const ps = list.filter(p => p.clinic === k);
     html += `<div class="grp"><span>${CLINICS[k].flag} ${CLINICS[k].name}${S.closed[k] ? ' · cerrada 🏖️' : ''}</span><span>${ps.length}/${CLINICS[k].cap}</span></div>`;
+    if (S.location === k) html += `<button class="side-more" data-more="${k}">🚑 Atender más animales</button>`;
     if (!ps.length) html += `<div class="empty">Sin pacientes ahora mismo.</div>`;
     for (const p of ps) {
       const c = G.caseOf(p); let tm, cls = '';
@@ -172,6 +183,7 @@ function bindUI() {
   $('#sideToggle').onclick = () => { $('#side').classList.toggle('collapsed'); sfx.tap(); };
   if (innerWidth < 760) $('#side').classList.add('collapsed');
   $('#sideBody').onclick = (e) => {
+    const m = e.target.closest('[data-more]'); if (m) return callMore(m.dataset.more);
     const b = e.target.closest('[data-pid]'); if (!b) return;
     const p = S.patients.find(x => x.id === +b.dataset.pid); if (!p) return;
     if (S.location === p.clinic) { if (innerWidth < 760) $('#side').classList.add('collapsed'); openPatient(p.id); }
@@ -188,6 +200,7 @@ function bindUI() {
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
   addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closePop(); } });
   $('#skip').onclick = () => driveCtl && driveCtl.skip();
+  bindV2();
 }
 
 function toast(text, cls = '') {
@@ -245,8 +258,10 @@ function openAle() {
   if (!house || busy) return; sfx.tap();
   openPop(house.ale.root, () => `${aleBars()}
     <p>${G.felicidad(S.ale) < 40 ? 'Está de bajón. Un buen chuletón o un masaje lo arreglan todo.' : 'Mantenerle siempre feliz es tu otra gran misión.'}</p>
-    <div class="row2"><button class="btn primary" data-act="massage">💆‍♂️ Masaje</button><button class="btn" data-act="cook">🍳 Cocinarle</button></div>`,
-  (act) => { if (act === 'massage') doMassage(); if (act === 'cook') openCook(house.ale.root); });
+    <div class="row2"><button class="btn primary" data-act="massage">💆‍♂️ Masaje</button><button class="btn" data-act="cook">🍳 Cocinarle</button></div>
+    <div class="row2"><button class="btn" data-act="romance">❤️‍🔥 Noche romántica</button><button class="btn" data-act="dance">💃 Bailar</button></div>
+    <button class="btn" data-act="play">🕹️ Jugar como Alejandro (flechas)</button>`,
+  (act) => { if (act === 'massage') doMassage(); if (act === 'cook') openCook(house.ale.root); if (act === 'romance') romanceScene(); if (act === 'dance') danceScene(); if (act === 'play') { closePop(); setCtrl('ale'); } });
 }
 function openCook(anchor) {
   if (!house || busy) return; sfx.tap();
@@ -258,7 +273,7 @@ function openCook(anchor) {
 async function cook(food) {
   if (S.money < food.price) return;
   closePop(); busy = true;
-  const h = house; await h.goTo('kitchen');
+  const h = house; await h.goTo(h.saf, 'kitchen');
   if (house !== h) { busy = false; return; }
   h.cookSteam(true);
   const l = bubble(h.saf.head, `Cocinando ${food.emoji}…`, 3300);
@@ -361,7 +376,7 @@ function openPatient(id) {
       ${ready ? `<button class="btn primary" data-act="review">🩺 Pasar ${c.revTxt}</button>` : `<button class="btn" disabled>⏳ Faltan ${G.fmtLeft(q.reviewAt - now)} (tiempo real)</button>`}
       <p style="font-size:12px">Si no pasas la revisión antes del límite, ${q.name} empeora y puede morir.</p>`;
     }
-    return `<h3>${em} ${esc(q.name)} <small>${q.species} · ${CLINICS[q.clinic].name}</small></h3><b>${esc(c.title)}</b><p>${esc(c.desc)}</p>${body}`;
+    return `<h3>${em} ${esc(q.name)} <small>${q.species} · ${CLINICS[q.clinic].name}</small></h3><div class="prob"><span>${c.sym}</span><div><small>Problema</small><b>${esc(c.short)}</b></div></div><b>${esc(c.title)}</b><p>${esc(c.desc)}</p>${body}`;
   }, (act) => {
     if (act.startsWith('t:')) doTreat(p.id, act.slice(2));
     if (act === 'review') doReview(p.id);
@@ -371,11 +386,11 @@ async function doTreat(id, tid) {
   const p = S.patients.find(x => x.id === id); if (!p || busy) return;
   closePop(); busy = true;
   const c = G.caseOf(p), now = Date.now();
-  const r = G.treat(S, p, tid, now);
-  if (r.ok && c.acc && r.review) p.accessory = c.acc;
+  const r = G.treat(S, p, tid, now), acc = ACC_FOR[c.t];
+  if (r.ok && r.review) p.accessory = acc;
   if (r.ok && !r.review) cured.add(id);
   G.save(S);
-  const cl = clinic; await cl.treatAnim(id, r.ok, r.ok ? c.acc : null); busy = false;
+  const cl = clinic; await cl.treatAnim(id, r.ok, r.ok ? acc : null); busy = false;
   if (clinic !== cl) return;
   const anchor = cl.focus(id) || cl.saf.head;
   if (r.ok) {
@@ -435,7 +450,7 @@ async function travelTo(dest) {
   traveling = true; closePop(); busy = false;
   const from = S.location, turbo = !!S.upgrades.turbo;
   if (house) { // Safiye sale de casa y se sube al Porsche
-    await house.goTo('drive'); house.showSafiye(false);
+    if (ctrl === 'ale') setCtrl('safi'); await house.goTo(house.saf, 'drive'); house.showSafiye(false);
     const car = house.porsche; sfx.engine(3);
     await new Promise(r => { let k = 0; const f = (dt) => { k += dt; car.position.x += dt * (2 + k * 10); car.userData.wheels.forEach(w => (w.rotation.z -= dt * 15)); if (k > 1.2) { engine.updaters.delete(f); r(); } }; engine.updaters.add(f); });
   } else sfx.engine(3);
@@ -444,7 +459,7 @@ async function travelTo(dest) {
   const km = dest === 'casa' || from === 'casa' ? (dest === 'estambul' || from === 'estambul' ? '2.200 km' : dest === 'barcelona' || from === 'barcelona' ? '1.050 km' : '6 km') : '—';
   $('#travelTxt').textContent = `${fromN} → ${toN}${km !== '—' ? ' · ' + km : ''}`; $('#travel').hidden = false;
   const dur = turbo ? 2.6 : 4.6;
-  await new Promise(r => { driveCtl = buildDrive(engine, dest, S.porscheColor, dur, r); lighting(); });
+  await new Promise(r => { driveCtl = buildDrive(engine, dest, S.porscheColor, dur, r, !!S.upgrades.turbo); lighting(); });
   driveCtl = null; $('#travel').hidden = true;
   S.location = dest; G.save(S);
   loadScene(dest); traveling = false; renderHUD(Date.now());
@@ -534,5 +549,218 @@ function awaySummary(events, away) {
   <button class="btn primary" data-act="ok">¡A trabajar!</button>`, (a) => a === 'ok' && closeModal());
 }
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+
+/* ============ v2: casa jugable con flechas ============ */
+let ctrl = 'safi', aleCmd = false, promptKey = '', promptAt = 0, nearHot = null;
+const keys = new Set(), camFwd = new THREE.Vector3(), camRight = new THREE.Vector3();
+const actor = () => (ctrl === 'ale' ? house.ale : house.saf);
+function setCtrl(w) {
+  ctrl = w;
+  document.querySelectorAll('#who button').forEach(b => b.classList.toggle('on', b.dataset.who === w));
+  if (house && w === 'ale') { house.ale.busy = false; house.standUp(house.ale); S.aleOverride = null; bubble(house.ale.head, '¡Ahora mando yo! 😎', 2000); }
+  promptKey = ''; renderHome(); sfx.tap();
+}
+function controlLoop(dt) {
+  if (!house || traveling) return;
+  const a = actor();
+  if (!$('#modal').hidden) keys.clear();
+  let x = 0, z = 0;
+  if (keys.has('ArrowUp')) z += 1; if (keys.has('ArrowDown')) z -= 1; if (keys.has('ArrowLeft')) x -= 1; if (keys.has('ArrowRight')) x += 1;
+  if ((x || z) && !a.busy) {
+    engine.camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize(); camRight.set(-camFwd.z, 0, camFwd.x);
+    house.move(a, camFwd.x * z + camRight.x * x, camFwd.z * z + camRight.z * x, dt);
+    if (ctrl === 'ale') S.aleOverride = null;
+    if (!$('#pop').hidden) closePop();
+    const tg = engine.controls.target, p = a.root.position, k = Math.min(1, dt * 2.2);
+    const ddx = (p.x - tg.x) * k, ddz = (p.z - tg.z) * k; tg.x += ddx; tg.z += ddz; engine.camera.position.x += ddx; engine.camera.position.z += ddz;
+  } else house.move(a, 0, 0, dt);
+  promptAt += dt; if (promptAt > 0.15) { promptAt = 0; updatePrompt(); }
+}
+function updatePrompt() {
+  if (!house) return hidePrompt();
+  const a = actor(); if (a.busy || aleCmd) return hidePrompt();
+  const h = house.nearSpot(a, ctrl); nearHot = h;
+  const key = h ? h.id + ctrl + (music.playing || '') : '';
+  if (key === promptKey) return; promptKey = key;
+  if (!h) { $('#prompt').hidden = true; return; }
+  const el = $('#prompt'); el.hidden = false;
+  el.innerHTML = `<b>${h.emoji} ${h.name}</b>` + h[ctrl].map((act, i) => `<button data-act="${act}">${i === 0 ? '<kbd>E</kbd> ' : i === 1 ? '<kbd>R</kbd> ' : ''}${ACTIONS[act][0]} ${act === 'musica' ? (music.playing ? 'Apagar la música' : 'Poner música') : ACTIONS[act][1]}</button>`).join('');
+}
+function hidePrompt() { const el = $('#prompt'); if (el) el.hidden = true; promptKey = ''; nearHot = null; }
+
+const TEMP_LINES = {
+  ducha: { ale: '🎤 ¡Bachata en la duchaaa! 🫧', safi: '🫧 Una duchita rápida…' }, cesped: { any: '🌱 ¡Rrrrrrrrr!' }, macetas: { any: '🪴 Agüita para las plantas' },
+  nevera: { ale: '🧀 Solo un poquito de jamón…', safi: '🍫 Un trocito de chocolate…' }, barbacoa: { safi: '🔥 ¡Barbacoa para mi Alejandro!' },
+  piscina: { safi: '🛟 ¡Qué gusto!' }, dormir: { safi: '😴 Cinco minutitos…' },
+};
+const PERSISTENT = ['play', 'trabajo', 'barbacoa', 'piscina', 'dormir'];
+async function doAction(who, act, walk = true) {
+  if (!house || traveling) return;
+  const h = house, p = who === 'ale' ? h.ale : h.saf;
+  if (act === 'viajar') return openTravel();
+  if (act === 'cocinar') return openCook(h.saf.root);
+  if (act === 'masaje') return doMassage();
+  if (act === 'musica') return toggleMusic();
+  if (act === 'romance') return romanceScene();
+  if (act === 'bailar') return danceScene();
+  if (p.busy) return;
+  const spot = HOTSPOTS.find(x => x[who].includes(act));
+  closePop(); hidePrompt();
+  if (who === 'ale') aleCmd = true;
+  if (walk && spot) {
+    const [nx, nz] = h.NODES[spot.node];
+    if (Math.hypot(p.root.position.x - nx, p.root.position.z - nz) > 0.5) { p.busy = true; await h.goTo(p, spot.node); p.busy = false; }
+  }
+  if (house !== h) { aleCmd = false; return; }
+  const now = Date.now();
+  let fx = null;
+  if (who === 'ale' && PERSISTENT.includes(act)) {
+    fx = G.aleDo(S, act, now);
+    if (!fx.ok) { toast(`⏳ Alejandro ya lo ha hecho hace poco. Prueba en ${G.fmtLeft(fx.wait)}.`); aleCmd = false; return; }
+    h.setActivity(act);
+  } else {
+    const fxAct = act === 'barbacoa' ? 'barbacoaSafi' : (act === 'piscina' || act === 'dormir' || (act === 'nevera' && who === 'safi')) ? null : act;
+    if (fxAct) { fx = G.aleDo(S, fxAct, now); if (!fx.ok) { toast(`⏳ Eso ya se hizo hace poco. Prueba en ${G.fmtLeft(fx.wait)}.`); aleCmd = false; return; } }
+    const line = TEMP_LINES[act]; if (line) bubble(p.head, line[who] || line.any, 3500);
+    await h.doTemp(p, act);
+    if (act === 'cesped') S.lawnCut = Date.now();
+  }
+  aleCmd = false;
+  if (house !== h) return;
+  if (fx && fx.txt) { toast(fx.txt, 'good'); engine.label(h.ale.head, '❤️', 'float', 0.9); sfx.ok(); }
+  G.save(S); renderHUD(Date.now()); promptKey = '';
+}
+const spotAnchor = new THREE.Object3D();
+function openSpot(id) {
+  if (!house || traveling) return;
+  const h = HOTSPOTS.find(x => x.id === id); if (!h) return;
+  if (id === 'speaker') return openMusic();
+  const opts = [...h.ale.map(a => ['ale', a]), ...h.safi.filter(a => !(a === 'romance' && h.ale.includes('romance'))).map(a => ['safi', a])];
+  if (opts.length === 1) { const [w, a] = opts[0]; toast(`${ACTIONS[a][0]} ${w === 'ale' ? 'Alejandro' : 'Safi'}: ${ACTIONS[a][1].toLowerCase()}`); return doAction(w, a, true); }
+  spotAnchor.position.set(house.NODES[h.node][0], 0, house.NODES[h.node][1]); engine.world.add(spotAnchor); sfx.tap();
+  openPop(spotAnchor, () => `<h3>${h.emoji} ${h.name}</h3><p>¿Quién lo hace?</p>${opts.map(([w, a]) => `<button class="food" data-act="${w}:${a}"><span class="em">${ACTIONS[a][0]}</span><span class="tx"><b>${ACTIONS[a][1]}</b><small>${a === 'romance' ? 'Safi y Alejandro' : w === 'ale' ? 'Alejandro' : 'Safi'}</small></span></button>`).join('')}`,
+    (act) => { const [w, a] = act.split(':'); doAction(w, a, true); }, 1.2);
+}
+
+/* ---------- Música latina ---------- */
+function setMusic(style) {
+  if (style) { music.play(style); S.music = { on: true, style }; } else { music.stop(); S.music = { on: false, style: (S.music && S.music.style) || 'bachata' }; }
+  if (house) house.setMusic(!!style);
+  promptKey = ''; renderHome(); G.save(S);
+}
+function toggleMusic() { setMusic(music.playing ? null : ((S.music && S.music.style) || 'bachata')); toast(music.playing ? `🎵 Suena ${music.styles[music.playing] || 'música'} 💃` : '🔇 Música apagada'); }
+function openMusic() {
+  const sp = HOTSPOTS.find(x => x.id === 'speaker'); spotAnchor.position.set(3.0, 0.6, 4.05); engine.world.add(spotAnchor); sfx.tap();
+  openPop(spotAnchor, () => `<h3>🎵 Música</h3><p>${music.playing ? `Suena <b>${music.styles[music.playing] || 'música'}</b>.` : 'El altavoz está apagado.'}</p>
+    <div class="row2">${Object.entries(music.styles).map(([k, n]) => `<button class="btn ${music.playing === k ? 'primary' : ''}" data-act="m:${k}">${n}</button>`).join('')}<button class="btn" data-act="m:off">🔇 Apagar</button></div>
+    <button class="btn primary" data-act="dance">💃🕺 Bailar juntos</button>`,
+  (a) => { if (a === 'dance') { closePop(); danceScene(); } else { setMusic(a === 'm:off' ? null : a.slice(2)); openMusic(); } }, 1.0);
+}
+async function danceScene() {
+  if (!house || house.ale.busy || house.saf.busy) return;
+  closePop(); hidePrompt(); aleCmd = true; const h = house;
+  if (!music.playing || music.playing === 'romance') setMusic('bachata');
+  bubble(h.ale.head, '¿Bailamos, Safi? 💃🕺', 2500);
+  await h.dance(); aleCmd = false;
+  const fx = G.aleDo(S, 'bailar', Date.now()); if (house === h) { toast(fx.txt, 'good'); sfx.ok(); engine.label(h.ale.head, '❤️', 'float', 0.9); }
+  G.save(S); renderHUD(Date.now());
+}
+const waitFor = (fn, ms) => new Promise(r => { const t0 = Date.now(); const iv = setInterval(() => { if (fn() || Date.now() - t0 > ms) { clearInterval(iv); r(); } }, 100); });
+async function romanceScene() {
+  if (!house || house.ale.busy || house.saf.busy || traveling) return;
+  const last = (S.cool || {}).romance;
+  if (last && Date.now() - last < 30 * MIN) return toast(`😅 Alejandro necesita recuperarse. Prueba en ${G.fmtLeft(30 * MIN - (Date.now() - last))}.`);
+  closePop(); hidePrompt(); aleCmd = true;
+  const h = house, prev = music.playing;
+  bubble(h.saf.head, '¿Vamos a la cama, Alejandro? 😏', 2500);
+  const done = h.romance();
+  await waitFor(() => h.romanceOn || house !== h, 40000);
+  if (house !== h) { aleCmd = false; return; }
+  // se apagan las luces y se encienden las rojas
+  engine.setLighting(1.5, false);
+  engine.nightLights.forEach(l => { if (l.isLight) l.intensity = 0; else if (l.material) l.material.emissiveIntensity = 0; });
+  engine.scene.background = new THREE.Color('#1a0710'); engine.sun.intensity = 0.02; engine.hemi.intensity = 0.06; engine.scene.environmentIntensity = 0.04;
+  music.play('romance'); h.setMusic(true);
+  bubble(h.ale.head, 'Se apagan las luces… 🙈', 3000);
+  const iv = setInterval(() => { if (house === h) engine.label(h.ale.head, ['❤️', '🔥', '💋', '🙈', '💕'][Math.floor(Math.random() * 5)], 'float', 0.5 + Math.random() * 0.8); }, 650);
+  await done; clearInterval(iv);
+  const fx = G.aleDo(S, 'romance', Date.now());
+  if (prev && prev !== 'romance') music.play(prev); else { music.stop(); }
+  aleCmd = false;
+  if (house === h) { h.setMusic(!!music.playing); lighting(); bubble(h.ale.head, 'Safi… eres la mejor ❤️', 3500); toast(fx.txt || 'Noche romántica ❤️‍🔥', 'good'); sfx.ok(); }
+  G.save(S); renderHUD(Date.now());
+}
+
+/* ---------- Panel de casa, más pacientes, lotería, consejos ---------- */
+function renderHome() {
+  if (!house) return;
+  const seen = new Set(), list = [];
+  if (ctrl === 'safi') { list.push(['masaje', { name: 'Alejandro' }]); seen.add('masaje'); }
+  for (const h of HOTSPOTS) for (const a of h[ctrl]) if (!seen.has(a)) { seen.add(a); list.push([a, h]); }
+  let html = list.map(([a, h]) => `<button class="act" data-a="${a}"><span>${ACTIONS[a][0]}</span>${ACTIONS[a][1]}<small>${h.name}</small></button>`).join('');
+  if (ctrl === 'safi') html += `<div class="grp"><span>Mandar a Alejandro a…</span></div>` + ['play', 'trabajo', 'barbacoa', 'piscina', 'ducha', 'cesped', 'dormir'].map(a => `<button class="act" data-ale="${a}"><span>${ACTIONS[a][0]}</span>${ACTIONS[a][1]}</button>`).join('');
+  $('#homeActs').innerHTML = html;
+  $('#musicRow').innerHTML = `<button data-m="off" class="${!music.playing ? 'on' : ''}">🔇</button>` + Object.entries(music.styles).map(([k, n]) => `<button data-m="${k}" class="${music.playing === k ? 'on' : ''}">🎵 ${n}</button>`).join('');
+}
+function callMore(k) {
+  const n = G.callMore(S, k, Date.now(), 2);
+  if (!n) toast('La sala de espera está llena. ¡Atiende primero a los que ya hay!');
+  else { toast(`🚑 Han llegado ${n} pacientes nuevos`, 'good'); sfx.ding(); }
+  if (clinic) clinic.sync(S.patients, cured); G.save(S); renderHUD(Date.now());
+}
+function lottery() {
+  openModal(`<h2>🎰 ¡Me ha tocado la lotería!</h2><p class="lead">Botón de la versión beta: Safiye se hace rica y desbloquea todo para probar el juego.</p>
+  <ul><li>💶 +1.000.000 €</li><li>🏥 Clínicas de Estambul y Barcelona abiertas</li><li>🏎️ Porsche 911 GT3 RS con alerón gigante</li><li>🛠️ Todas las mejoras</li></ul>
+  <button class="btn primary" data-act="yes">¡Cobrar el premio!</button>`, (a) => {
+    if (a !== 'yes') return;
+    G.lottery(S, Date.now()); G.save(S); closeModal(); sfx.ok(); setTimeout(sfx.coin, 250); setTimeout(sfx.coin, 500);
+    toast('🎰 ¡UN MILLÓN DE EUROS! Safiye ya es rica', 'good'); loadScene(S.location); renderHUD(Date.now());
+  });
+}
+const TIPS = {
+  casa: ['Usa las flechas ⬆️⬇️⬅️➡️ para mover a Safi por la casa', 'Acércate a algo y pulsa E (o Espacio) para interactuar', 'Toca el sofá para mandar a Alejandro a jugar a la Play: le pone contento 🎮',
+    'En el panel de la izquierda puedes jugar como Alejandro 🧔', 'Toca el altavoz junto a la tele para poner bachata 💃', 'Un chuletón le encanta; el McDonald\'s le pone triste 🍔',
+    'La cama esconde una sorpresa… 🔥', 'Toca el Porsche para ir a tus clínicas 🏎️', 'Cortar el césped y regar las macetas también alegra a Alejandro 🌱'],
+  clinic: ['Toca un animal para ver su problema y elegir el tratamiento', 'El emoji sobre cada animal te dice qué le pasa', 'Pulsa «Atender más animales» para que entren más pacientes 🚑',
+    'Los que tienen 🩺 necesitan una revisión horas después (tiempo real)', 'Si te equivocas de tratamiento, al animal le queda menos tiempo', 'Toca el Porsche para volver a casa con Alejandro'],
+};
+let tipI = 0, tipTimer = null, tipsOff = false;
+function showTip(reset) {
+  if (tipsOff || !S) return;
+  const list = S.location === 'casa' ? TIPS.casa : TIPS.clinic; if (reset) tipI = 0;
+  $('#tipTxt').textContent = '💡 ' + list[tipI % list.length]; $('#tip').hidden = false; tipI++;
+  clearTimeout(tipTimer); tipTimer = setTimeout(() => showTip(false), 9000);
+}
+function bindV2() {
+  $('#lotto').onclick = lottery;
+  if (innerWidth < 760) $('#home').classList.add('collapsed');
+  $('#homeToggle').onclick = () => { $('#home').classList.toggle('collapsed'); sfx.tap(); };
+  $('#more').onclick = () => callMore(S.location);
+  $('#tipX').onclick = () => { tipsOff = true; $('#tip').hidden = true; clearTimeout(tipTimer); };
+  $('#who').onclick = e => { const b = e.target.closest('[data-who]'); if (b) setCtrl(b.dataset.who); };
+  $('#homeActs').onclick = e => { const b = e.target.closest('[data-a],[data-ale]'); if (!b) return; if (b.dataset.a) doAction(ctrl, b.dataset.a, true); else doAction('ale', b.dataset.ale, true); };
+  $('#musicRow').onclick = e => { const b = e.target.closest('[data-m]'); if (b) setMusic(b.dataset.m === 'off' ? null : b.dataset.m); };
+  $('#prompt').onclick = e => { const b = e.target.closest('[data-act]'); if (b) doAction(ctrl, b.dataset.act, false); };
+  const ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'], WASD = { w: 'ArrowUp', s: 'ArrowDown', a: 'ArrowLeft', d: 'ArrowRight' };
+  const keyOf = (e) => (ARROWS.includes(e.key) ? e.key : WASD[(e.key || '').toLowerCase()]);
+  addEventListener('keydown', e => {
+    if (!$('#modal').hidden || !house) return;
+    const k = keyOf(e); if (k) { keys.add(k); e.preventDefault(); return; }
+    if (['e', 'E', ' ', 'Enter'].includes(e.key) && nearHot && nearHot[ctrl][0]) { e.preventDefault(); doAction(ctrl, nearHot[ctrl][0], false); }
+    if (['r', 'R'].includes(e.key) && nearHot && nearHot[ctrl][1]) doAction(ctrl, nearHot[ctrl][1], false);
+  });
+  addEventListener('keyup', e => { const k = keyOf(e); if (k) keys.delete(k); });
+  addEventListener('blur', () => keys.clear());
+  $('#dpad').addEventListener('pointerdown', e => {
+    const b = e.target.closest('[data-k]'); if (!b) return; e.preventDefault();
+    if (b.dataset.k === 'act') { if (nearHot && nearHot[ctrl][0]) doAction(ctrl, nearHot[ctrl][0], false); return; }
+    keys.add(b.dataset.k); try { b.setPointerCapture(e.pointerId); } catch (er) { /* nada */ }
+  });
+  const up = e => { const b = e.target.closest('[data-k]'); if (b) keys.delete(b.dataset.k); };
+  $('#dpad').addEventListener('pointerup', up); $('#dpad').addEventListener('pointercancel', up);
+  engine.onHover = (hint, e) => { const t = $('#tooltip'); if (!hint) { t.hidden = true; return; } t.hidden = false; t.textContent = hint; t.style.left = e.clientX + 'px'; t.style.top = e.clientY + 'px'; };
+  if (S.music && S.music.on) { const go = () => { if (!music.playing) setMusic(S.music.style || 'bachata'); removeEventListener('pointerdown', go); removeEventListener('keydown', go); }; addEventListener('pointerdown', go); addEventListener('keydown', go); }
+}
 
 gate();
