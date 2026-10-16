@@ -95,6 +95,12 @@ function tick() {
     nextT += dur; step++;
   }
 }
+// se pausa al cambiar de pestaña o bloquear el móvil, y sigue al volver
+let paused = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && style) { paused = style; music.stop(); }
+  else if (!document.hidden && paused) { const p = paused; paused = null; music.play(p); }
+});
 export const music = {
   styles: { bachata: 'Bachata', salsa: 'Salsa', reggaeton: 'Reguetón' },
   play(st) {
@@ -102,6 +108,6 @@ export const music = {
     master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setValueAtTime(st === 'romance' ? 0.4 : 0.3, ctx.currentTime);
     if (!timer) timer = setInterval(tick, 25);
   },
-  stop() { style = null; if (timer) { clearInterval(timer); timer = null; } },
+  stop() { style = null; if (timer) { clearInterval(timer); timer = null; } if (master && ctx) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setValueAtTime(0.0001, ctx.currentTime); } },
   get playing() { return style; },
 };

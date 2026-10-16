@@ -1,6 +1,10 @@
 import { CASES, NAMES, PAY, SPECIES_WEIGHTS, CLINICS, TREATMENTS, MIN, H } from './data.js';
 
-const KEY = 'safiye-911-save-v1';
+export const LEGACY_KEY = 'safiye-911-save-v1';
+let KEY = LEGACY_KEY;
+export function useSessionKey(k) { KEY = LEGACY_KEY + ':' + k; }
+export function loadLegacy() { try { const raw = localStorage.getItem(LEGACY_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+export function dropLegacy() { try { localStorage.removeItem(LEGACY_KEY); } catch (e) { /* nada */ } }
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 

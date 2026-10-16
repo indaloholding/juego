@@ -16,6 +16,7 @@ import { CASES, TREATMENTS, CLINICS, FOODS, UPGRADES, PORSCHE_COLORS, ALE_ACTIVI
 import * as G from './state.js';
 import { legalHTML } from './legal.js';
 import { sfx, setSound } from './sfx.js';
+import { session, keyOf } from './cloud.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -30,9 +31,10 @@ let S, engine, house = null, clinic = null, busy = false, traveling = false;
 const cured = new Set();
 
 /* ============ Acceso con código 911 ============ */
-function gate() {
+function gate(next) {
   let ok = false; try { ok = localStorage.getItem(ACCESS) === 'ok'; } catch (e) { /* privado */ }
-  if (ok) return start();
+  if (ok) return next();
+  $('#sess').hidden = true; $('#gate').hidden = false;
   let code = '';
   const cells = [...document.querySelectorAll('#code i')];
   const draw = () => cells.forEach((c, i) => { c.textContent = code[i] ? '•' : ''; c.classList.toggle('on', i === code.length); });
@@ -46,7 +48,7 @@ function gate() {
       if (code === CODE) {
         $('#code').classList.add('ok'); cells.forEach((c, i) => (c.textContent = CODE[i])); sfx.engine(2.2);
         try { localStorage.setItem(ACCESS, 'ok'); } catch (e) { /* nada */ }
-        setTimeout(start, 900);
+        setTimeout(next, 900);
       } else {
         $('#code').classList.add('shake'); sfx.bad(); $('#hint').textContent = 'Código incorrecto. Piensa en un Porsche…';
         setTimeout(() => { $('#code').classList.remove('shake'); code = ''; draw(); }, 450);
@@ -58,10 +60,17 @@ function gate() {
 }
 
 /* ============ Arranque ============ */
-function start() {
-  $('#gate').hidden = true; $('#game').hidden = false;
+function start(remote) {
+  $('#gate').hidden = true; $('#sess').hidden = true; $('#game').hidden = false;
   const now = Date.now();
-  S = G.load() || G.newGame(now);
+  G.useSessionKey(keyOf(player.name));
+  const local = G.load();
+  if (remote && (!local || (remote.last || 0) >= (local.last || 0))) S = remote;
+  else if (local) S = local;
+  else if (player.importLegacy && G.loadLegacy()) { S = G.loadLegacy(); G.dropLegacy(); }
+  else S = G.newGame(now);
+  S.player = player.name;
+  $('#playerName').textContent = player.name;
   const away = now - S.last;
   const events = G.advance(S, now);
   applySettings();
@@ -75,8 +84,9 @@ function start() {
   else if (away > 2 * MIN && events.length) awaySummary(events, away);
   G.save(S);
   if (import.meta.env.DEV) window.__safiye = { get S() { return S; }, get engine() { return engine; }, get house() { return house; }, get clinic() { return clinic; }, travelTo, loadScene, tick, massageGame, doAction, setCtrl, romanceScene, danceScene, setMusic };
-  addEventListener('visibilitychange', () => { if (document.hidden) G.save(S); });
-  addEventListener('pagehide', () => G.save(S));
+  addEventListener('visibilitychange', () => { if (document.hidden) { G.save(S); cloudPush(true); } });
+  addEventListener('pagehide', () => { G.save(S); cloudPush(true); });
+  if (offline) toast('Sin conexión: la partida se guarda en este dispositivo y se subirá cuando vuelva internet.');
 }
 function applySettings() {
   document.documentElement.dataset.theme = S.settings.theme;
@@ -131,6 +141,7 @@ function tick() {
   }
   if (house && ctrl !== 'ale' && !house.ale.busy && !aleCmd) house.setActivity(G.aleActivity(new Date(now), S));
   if (now - lastSave > 5000) { G.save(S); lastSave = now; }
+  if (now - lastPush > 30000) cloudPush(false);
   if (new Date(now).getSeconds() === 0) lighting();
   renderHUD(now);
   if (popRefresh) popRefresh();
@@ -450,7 +461,7 @@ async function travelTo(dest) {
   traveling = true; closePop(); busy = false;
   const from = S.location, turbo = !!S.upgrades.turbo;
   if (house) { // Safiye sale de casa y se sube al Porsche
-    if (ctrl === 'ale') setCtrl('safi'); await house.goTo(house.saf, 'drive'); house.showSafiye(false);
+    if (ctrl === 'ale') setCtrl('safi'); if (music.playing) setMusic(null); await house.goTo(house.saf, 'drive'); house.showSafiye(false);
     const car = house.porsche; sfx.engine(3);
     await new Promise(r => { let k = 0; const f = (dt) => { k += dt; car.position.x += dt * (2 + k * 10); car.userData.wheels.forEach(w => (w.rotation.z -= dt * 15)); if (k > 1.2) { engine.updaters.delete(f); r(); } }; engine.updaters.add(f); });
   } else sfx.engine(3);
@@ -508,14 +519,20 @@ function openSettings() {
   <li>En casa, toca a <b>Alejandro</b> para darle un masaje o cocinarle. Lo gourmet le hace feliz; el McDonald's, no.</li>
   <li>Viaja en tu <b>Porsche 911</b> entre casa y las clínicas de Stuttgart, Estambul y Barcelona (allí manda Emilio).</li>
   <li>¿Te vas de viaje? Cierra las clínicas «por vacaciones» desde el menú Viajar.</li></ul>
+  <h3>👤 Tu sesión: ${esc(player.name)}</h3>
+  <p style="font-size:13px">Tu partida se guarda en la nube: entra desde cualquier móvil u ordenador con tu nombre y tu PIN.</p>
+  <div class="row2"><button class="btn" data-act="switch">🔄 Cambiar de sesión</button><button class="btn" data-act="delsess">🗑️ Borrar mi sesión</button></div>
   <button class="btn" data-act="onb">Ver la introducción otra vez</button>
   <button class="btn danger" data-act="reset">Empezar de cero</button>
   <p class="fine"><a href="#" data-legal="aviso">Aviso legal</a> · <a href="#" data-legal="privacidad">Privacidad</a> · <a href="#" data-legal="cookies">Cookies</a> · <a href="#" data-legal="terminos">Términos</a><br>Hecho con cariño para Safiye · Indalo Holding</p>`,
   (a) => {
     if (a.startsWith('set:')) { const [, k, v] = a.split(':'); S.settings[k] = v === 'true' ? true : v === 'false' ? false : v; applySettings(); lighting(); G.save(S); openSettings(); }
     if (a === 'onb') onboarding();
+    if (a === 'switch') switchSession();
+    if (a === 'delsess') openModal(`<h2>¿Borrar la sesión de ${esc(player.name)}?</h2><p>Se borrará para siempre tu partida de la nube y de este dispositivo. El nombre quedará libre.</p><button class="btn danger" data-act="yes">Sí, borrar mi sesión</button><button class="btn" data-act="no">Cancelar</button>`,
+      async (b) => { if (b !== 'yes') return openSettings(); try { if (player.token) await session.remove(player); } catch (e) { return toast(e.message, 'bad'); } G.wipe(); session.forgetName(player.name); session.forget(); location.reload(); });
     if (a === 'reset') openModal(`<h2>¿Empezar de cero?</h2><p>Se borrará toda la partida: dinero, clínicas, pacientes y el historial de Alejandro.</p><button class="btn danger" data-act="yes">Sí, borrar y empezar</button><button class="btn" data-act="no">Cancelar</button>`,
-      (b) => { if (b === 'yes') { G.wipe(); S = G.newGame(Date.now()); G.save(S); closeModal(); loadScene(S.location); renderHUD(Date.now()); toast('Nueva partida. ¡Suerte, doctora!'); } else openSettings(); });
+      (b) => { if (b === 'yes') { G.wipe(); S = G.newGame(Date.now()); S.player = player.name; G.save(S); cloudPush(true); closeModal(); loadScene(S.location); renderHUD(Date.now()); toast('Nueva partida. ¡Suerte, doctora!'); } else openSettings(); });
   });
 }
 
@@ -660,9 +677,13 @@ function openMusic() {
 async function danceScene() {
   if (!house || house.ale.busy || house.saf.busy) return;
   closePop(); hidePrompt(); aleCmd = true; const h = house;
-  if (!music.playing || music.playing === 'romance') setMusic('bachata');
+  const prev = music.playing;
+  if (!prev || prev === 'romance') { music.play('bachata'); h.setMusic(true); }
   bubble(h.ale.head, '¿Bailamos, Safi? 💃🕺', 2500);
   await h.dance(); aleCmd = false;
+  // al terminar, la música vuelve a como estaba (si estaba apagada, se apaga)
+  if (!prev) { music.stop(); if (house === h) h.setMusic(false); } else if (prev !== music.playing) music.play(prev);
+  renderHome();
   const fx = G.aleDo(S, 'bailar', Date.now()); if (house === h) { toast(fx.txt, 'good'); sfx.ok(); engine.label(h.ale.head, '❤️', 'float', 0.9); }
   G.save(S); renderHUD(Date.now());
 }
@@ -686,7 +707,8 @@ async function romanceScene() {
   const iv = setInterval(() => { if (house === h) engine.label(h.ale.head, ['❤️', '🔥', '💋', '🙈', '💕'][Math.floor(Math.random() * 5)], 'float', 0.5 + Math.random() * 0.8); }, 650);
   await done; clearInterval(iv);
   const fx = G.aleDo(S, 'romance', Date.now());
-  if (prev && prev !== 'romance') music.play(prev); else { music.stop(); }
+  if (prev && prev !== 'romance') music.play(prev); else music.stop();
+  renderHome();
   aleCmd = false;
   if (house === h) { h.setMusic(!!music.playing); lighting(); bubble(h.ale.head, 'Safi… eres la mejor ❤️', 3500); toast(fx.txt || 'Noche romántica ❤️‍🔥', 'good'); sfx.ok(); }
   G.save(S); renderHUD(Date.now());
@@ -734,6 +756,7 @@ function showTip(reset) {
 }
 function bindV2() {
   $('#lotto').onclick = lottery;
+  $('#player').onclick = openSettings;
   if (innerWidth < 760) $('#home').classList.add('collapsed');
   $('#homeToggle').onclick = () => { $('#home').classList.toggle('collapsed'); sfx.tap(); };
   $('#more').onclick = () => callMore(S.location);
@@ -760,7 +783,94 @@ function bindV2() {
   const up = e => { const b = e.target.closest('[data-k]'); if (b) keys.delete(b.dataset.k); };
   $('#dpad').addEventListener('pointerup', up); $('#dpad').addEventListener('pointercancel', up);
   engine.onHover = (hint, e) => { const t = $('#tooltip'); if (!hint) { t.hidden = true; return; } t.hidden = false; t.textContent = hint; t.style.left = e.clientX + 'px'; t.style.top = e.clientY + 'px'; };
-  if (S.music && S.music.on) { const go = () => { if (!music.playing) setMusic(S.music.style || 'bachata'); removeEventListener('pointerdown', go); removeEventListener('keydown', go); }; addEventListener('pointerdown', go); addEventListener('keydown', go); }
 }
 
-gate();
+
+/* ============ v3: sesiones (cada persona su partida) ============ */
+let player = { name: '', token: null }, offline = false, lastPush = 0;
+function cloudPush(urgent) {
+  if (!S || !player.token) return;
+  lastPush = Date.now();
+  session.save(player, S, urgent).then(() => { offline = false; }).catch(e => {
+    if (e.status === 401) { player.token = null; session.forget(); toast('Tu sesión ha caducado: vuelve a entrar para guardar en la nube.', 'bad'); }
+    else offline = true;
+  });
+}
+async function switchSession() {
+  G.save(S); try { await session.save(player, S); } catch (e) { /* se queda en local */ }
+  await session.logout(player); session.forget(); location.reload();
+}
+function sessView(view, opts = {}) {
+  const el = $('#sessBody'), cur = session.current, known = session.known;
+  $('#sess').hidden = false; $('#gate').hidden = true;
+  if (view === 'home') {
+    el.innerHTML = `${cur ? `<button class="btn primary big" data-s="continue">▶ Continuar como ${esc(cur.name)}</button>` : '<h2>¿Quién juega?</h2><p>Cada persona tiene su propia sesión: sus clínicas, sus animales y su Alejandro.</p>'}
+      <button class="btn ${cur ? '' : 'primary'} big" data-s="login">🔑 Iniciar sesión</button>
+      <button class="btn big" data-s="create">✨ Crear sesión nueva</button>
+      ${known.length ? `<p>Sesiones usadas en este dispositivo</p><div class="chips">${known.map(n => `<button data-name="${esc(n)}">👤 ${esc(n)}</button>`).join('')}</div>` : ''}`;
+  } else if (view === 'login') {
+    el.innerHTML = `<h2>🔑 Iniciar sesión</h2>
+      <label>Tu nombre<input type="text" id="sName" maxlength="24" autocomplete="username" value="${esc(opts.name || '')}" placeholder="Por ejemplo, Paco"></label>
+      <label>Tu PIN de 4 cifras<input type="password" id="sPin" class="pin" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="••••"></label>
+      <p class="err" id="sErr">${esc(opts.msg || '')}</p>
+      <button class="btn primary big" data-s="doLogin">Entrar</button><button class="link" data-s="home">← Volver</button>`;
+  } else if (view === 'create') {
+    const legacy = G.loadLegacy();
+    el.innerHTML = `<h2>✨ Crear sesión nueva</h2><p>Elige tu nombre y un PIN para que nadie más entre en tu partida.</p>
+      <label>Tu nombre<input type="text" id="sName" maxlength="24" autocomplete="username" placeholder="Por ejemplo, Soledad"></label>
+      <label>Inventa un PIN de 4 cifras<input type="password" id="sPin" class="pin" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="••••"></label>
+      <label>Repite el PIN<input type="password" id="sPin2" class="pin" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="••••"></label>
+      ${legacy ? '<label class="check"><input type="checkbox" id="sLegacy" checked> Usar la partida que ya hay en este dispositivo</label>' : ''}
+      <p class="err" id="sErr"></p>
+      <button class="btn primary big" data-s="doCreate">Crear mi sesión</button><button class="link" data-s="home">← Volver</button>`;
+  }
+  const first = el.querySelector('input:not([value]), input[value=""]') || el.querySelector('#sPin');
+  if (first && innerWidth > 760) first.focus();
+  el.onkeydown = (e) => { if (e.key === 'Enter') { const b = el.querySelector('[data-s^="do"]'); if (b) b.click(); } };
+}
+async function sessAction(a, btn) {
+  const err = (m) => { const e = $('#sErr'); if (e) e.textContent = m; sfx.bad(); };
+  const val = (id) => ($(id) ? $(id).value.trim() : '');
+  if (a === 'home' || a === 'login' || a === 'create') return sessView(a);
+  if (a === 'continue') {
+    const cur = session.current; btn.disabled = true; btn.textContent = 'Cargando tu partida…';
+    try { const r = await session.load(cur); player = { name: r.name, token: cur.token }; gate(() => start(r.data)); }
+    catch (e) {
+      if (e.status === 0) { player = { name: cur.name, token: cur.token }; offline = true; gate(() => start(null)); }
+      else { session.forget(); sessView('login', { name: cur.name, msg: e.message }); }
+    }
+    return;
+  }
+  if (a === 'doLogin') {
+    const name = val('#sName'), pin = val('#sPin');
+    if (name.length < 2) return err('Escribe tu nombre.'); if (!/^\d{4}$/.test(pin)) return err('El PIN son 4 cifras.');
+    btn.disabled = true;
+    try { const r = await session.login(name, pin); player = { name: r.name, token: r.token }; session.remember(player); sfx.ok(); gate(() => start(r.data)); }
+    catch (e) { btn.disabled = false; err(e.message); }
+    return;
+  }
+  if (a === 'doCreate') {
+    const name = val('#sName'), pin = val('#sPin'), pin2 = val('#sPin2');
+    if (!/^[\p{L}\p{N} ]{2,24}$/u.test(name)) return err('El nombre: de 2 a 24 letras o números.');
+    if (!/^\d{4}$/.test(pin)) return err('El PIN son 4 cifras.'); if (pin !== pin2) return err('Los dos PIN no coinciden.');
+    const useLegacy = $('#sLegacy') && $('#sLegacy').checked, legacy = useLegacy ? G.loadLegacy() : null;
+    btn.disabled = true;
+    try {
+      const r = await session.create(name, pin, legacy);
+      player = { name: r.name, token: r.token, importLegacy: useLegacy }; session.remember(player); sfx.ok();
+      if (legacy) G.dropLegacy();
+      gate(() => start(r.data));
+    } catch (e) { btn.disabled = false; err(e.message); }
+  }
+}
+function boot() {
+  $('#sessBody').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-s],[data-name]'); if (!b) return; e.preventDefault(); sfx.tap();
+    if (b.dataset.name) return sessView('login', { name: b.dataset.name });
+    sessAction(b.dataset.s, b);
+  });
+  sessView('home');
+}
+
+boot();
+

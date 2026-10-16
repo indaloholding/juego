@@ -17,8 +17,18 @@
   <link rel="apple-touch-icon" href="/og.jpg" />
 </head>
 <body>
+  <!-- Sesiones -->
+  <section id="sess" class="gate">
+    <div class="gate-inner">
+      <p class="eyebrow">Un regalo para la mejor veterinaria de Europa</p>
+      <h1 class="wordmark">Safiye<span>The Videogame</span></h1>
+      <div id="sessBody" class="sess"></div>
+    </div>
+    <footer class="legal-mini"><a href="#" data-legal="aviso">Aviso legal</a> · <a href="#" data-legal="privacidad">Privacidad</a> · <a href="#" data-legal="cookies">Cookies</a> · <a href="#" data-legal="terminos">Términos</a></footer>
+  </section>
+
   <!-- Acceso -->
-  <section id="gate" class="gate">
+  <section id="gate" class="gate" hidden>
     <div class="gate-inner">
       <p class="eyebrow">Un regalo para la mejor veterinaria de Europa</p>
       <h1 class="wordmark">Safiye<span>The Videogame</span></h1>
@@ -45,6 +55,7 @@
       <div class="stat"><span>⭐</span><b id="rep">3.0</b></div>
       <div class="stat clock"><span>🕒</span><b id="clock">--:--</b><small>hora real</small></div>
       <div class="stat loc" id="loc">🏠 Casa</div>
+      <button class="stat who" id="player" title="Tu sesión">👤 <b id="playerName">—</b></button>
     </header>
 
     <button class="ale glass" id="ale" aria-label="Estado de Alejandro">

@@ -244,3 +244,20 @@ kbd { background: var(--ink); color: var(--paper); border-radius: 5px; padding: 
   .home.collapsed .home-toggle { padding: 0 2px; }
   .dpad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); right: 8px; bottom: 92px; }
 }
+
+/* ---------- Sesiones ---------- */
+.sess { display: grid; gap: 10px; max-width: 340px; margin: 0 auto; text-align: left; }
+.sess h2 { font-family: var(--display); font-size: 22px; margin: 0; text-align: center; }
+.sess p { margin: 0; font-size: 14px; color: var(--ink-2); text-align: center; }
+.sess label { font-weight: 800; font-size: 13px; display: grid; gap: 4px; }
+.sess input[type=text], .sess input[type=password] { font: inherit; font-size: 18px; font-weight: 700; padding: 12px 14px; border-radius: 14px; border: 2px solid var(--line); background: #fff; color: #233d3b; }
+.sess input:focus { outline: 3px solid var(--teal); border-color: var(--teal); }
+.sess .pin { letter-spacing: .6em; text-align: center; font-family: var(--display); }
+.sess .big { font-size: 17px; padding: 14px; }
+.sess .err { color: var(--tomato); font-weight: 800; font-size: 13px; text-align: center; min-height: 18px; }
+.sess .check { display: flex; gap: 8px; align-items: center; font-weight: 700; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.chips button { border: 0; border-radius: 999px; padding: 7px 12px; font-weight: 800; background: #fff; box-shadow: 0 2px 0 #d9c49f; color: #233d3b; }
+.sess .link { border: 0; background: none; text-decoration: underline; font-weight: 700; color: var(--ink-2); }
+.stat.who { border: 0; cursor: pointer; }
+@media (max-width: 760px) { .stat.who { display: none; } }
